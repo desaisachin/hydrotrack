@@ -3,28 +3,40 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../theme/app_theme.dart';
 
 class StepProfileWidget extends StatelessWidget {
+  final String name;
   final String gender;
   final double age;
   final double weight;
   final String weightUnit;
+  final double height;
+  final String heightUnit;
   final double activityLevel;
+  final Function(String) onNameChanged;
   final Function(String) onGenderChanged;
   final Function(double) onAgeChanged;
   final Function(double) onWeightChanged;
   final Function(String) onWeightUnitChanged;
+  final Function(double) onHeightChanged;
+  final Function(String) onHeightUnitChanged;
   final Function(double) onActivityChanged;
 
   const StepProfileWidget({
     super.key,
+    required this.name,
     required this.gender,
     required this.age,
     required this.weight,
     required this.weightUnit,
+    required this.height,
+    required this.heightUnit,
     required this.activityLevel,
+    required this.onNameChanged,
     required this.onGenderChanged,
     required this.onAgeChanged,
     required this.onWeightChanged,
     required this.onWeightUnitChanged,
+    required this.onHeightChanged,
+    required this.onHeightUnitChanged,
     required this.onActivityChanged,
   });
 
