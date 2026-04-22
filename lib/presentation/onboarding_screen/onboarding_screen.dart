@@ -29,10 +29,13 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   late Animation<double> _fadeAnimation;
 
   // Profile data
+  String _name = '';
   String _gender = 'male';
   double _age = 28;
   double _weight = 70;
   String _weightUnit = 'kg';
+  double _height = 170;
+  String _heightUnit = 'cm';
   double _activityLevel = 1.3; // multiplier
 
   // Schedule data
@@ -80,9 +83,13 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 
   double _calculateDailyGoal() {
-    // WHO / Mayo Clinic formula: weight(kg) × 35ml × activity multiplier
+    // WHO / Mayo Clinic formula using weight, height, age (Mifflin-St Jeor inspired)
     double weightKg = _weightUnit == 'lbs' ? _weight * 0.453592 : _weight;
+    double heightCm = _heightUnit == 'in' ? _height * 2.54 : _height;
+    // Base: weight(kg) × 35ml × activity multiplier
     double base = weightKg * 35 * _activityLevel;
+    // Height bonus: taller people need more water
+    base += (heightCm - 170) * 5;
     // Age adjustment: over 55 → +10%
     if (_age > 55) base *= 1.1;
     // Gender adjustment: male → +15%
@@ -123,8 +130,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   Future<void> _completeOnboarding() async {
     // TODO: Persist to local DB / Riverpod for production
     final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('user_name', _name);
     await prefs.setString('gender', _gender);
     await prefs.setDouble('age', _age);
+    await prefs.setDouble('height', _height);
+    await prefs.setString('height_unit', _heightUnit);
     await prefs.setDouble('weight', _weight);
     await prefs.setString('weight_unit', _weightUnit);
     await prefs.setDouble('daily_goal_ml', _dailyGoalMl);
@@ -187,17 +197,24 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                       controller: _pageController,
                       physics: const NeverScrollableScrollPhysics(),
                       children: [
-                        StepProfileWidget(
+                       StepProfileWidget(
+                          name: _name,
                           gender: _gender,
                           age: _age,
                           weight: _weight,
                           weightUnit: _weightUnit,
+                          height: _height,
+                          heightUnit: _heightUnit,
                           activityLevel: _activityLevel,
+                          onNameChanged: (v) => setState(() => _name = v),
                           onGenderChanged: (v) => setState(() => _gender = v),
                           onAgeChanged: (v) => setState(() => _age = v),
                           onWeightChanged: (v) => setState(() => _weight = v),
                           onWeightUnitChanged: (v) =>
                               setState(() => _weightUnit = v),
+                          onHeightChanged: (v) => setState(() => _height = v),
+                          onHeightUnitChanged: (v) =>
+                              setState(() => _heightUnit = v),
                           onActivityChanged: (v) =>
                               setState(() => _activityLevel = v),
                         ),
