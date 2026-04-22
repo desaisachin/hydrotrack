@@ -66,7 +66,37 @@ class StepProfileWidget extends StatelessWidget {
               color: AppTheme.textSecondary,
             ),
           ),
-          const SizedBox(height: 32),
+         const SizedBox(height: 24),
+
+          // Name field
+          Text(
+            'Your Name',
+            style: GoogleFonts.manrope(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textSecondary,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: TextEditingController(text: name)
+              ..selection = TextSelection.collapsed(offset: name.length),
+            decoration: InputDecoration(
+              hintText: 'Enter your name',
+              hintStyle: GoogleFonts.manrope(
+                fontSize: 14,
+                color: AppTheme.muted,
+              ),
+            ),
+            style: GoogleFonts.manrope(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textPrimary,
+            ),
+            onChanged: onNameChanged,
+          ),
+          const SizedBox(height: 28),
 
           // Gender selector
           Text(
@@ -148,6 +178,45 @@ class StepProfileWidget extends StatelessWidget {
                     selected: weightUnit,
                     options: const ['kg', 'lbs'],
                     onChanged: onWeightUnitChanged,
+                  ),
+                ],
+              ),
+            ],
+          ),
+         const SizedBox(height: 24),
+
+          // Height slider + unit toggle
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _SliderField(
+                  label: 'Height',
+                  value: height,
+                  min: heightUnit == 'cm' ? 100 : 39,
+                  max: heightUnit == 'cm' ? 220 : 87,
+                  displayValue: '${height.round()} $heightUnit',
+                  onChanged: onHeightChanged,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Unit',
+                    style: GoogleFonts.manrope(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textSecondary,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _UnitToggle(
+                    selected: heightUnit,
+                    options: const ['cm', 'in'],
+                    onChanged: onHeightUnitChanged,
                   ),
                 ],
               ),
