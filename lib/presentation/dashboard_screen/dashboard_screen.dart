@@ -29,7 +29,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   double _dailyGoalMl = 2500;
   double _todayIntakeMl = 0;
   final int _streakDays = 7;
-  final String _userName = 'Alex';
+  String _userName = 'Alex';
   bool _isLoading = true;
 
   // Log entries for today
@@ -156,6 +156,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     await Future.delayed(const Duration(milliseconds: 400));
     if (mounted) {
       setState(() {
+        _userName = prefs.getString('user_name') ?? 'there';
         _dailyGoalMl = prefs.getDouble('daily_goal_ml') ?? 2500;
         _todayIntakeMl = _logEntries.fold(
           0.0,
