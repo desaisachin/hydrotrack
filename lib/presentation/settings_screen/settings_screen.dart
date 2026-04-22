@@ -16,6 +16,13 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _isLoading = true;
   bool _isSaving = false;
+  
+  // Profile
+  String _userName = '';
+  double _height = 170;
+  String _heightUnit = 'cm';
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _heightController = TextEditingController();
 
   // Reminders
   bool _reminderEnabled = true;
@@ -92,6 +99,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void dispose() {
     _goalController.dispose();
+    _nameController.dispose();
+    _heightController.dispose();
     super.dispose();
   }
 
@@ -110,6 +119,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       );
       _dailyGoalMl = prefs.getDouble('daily_goal_ml') ?? 2500;
       _goalController.text = _dailyGoalMl.round().toString();
+      _userName = prefs.getString('user_name') ?? '';
+      _nameController.text = _userName;
+      _height = prefs.getDouble('height') ?? 170;
+      _heightUnit = prefs.getString('height_unit') ?? 'cm';
+      _heightController.text = _height.round().toString();
 
       // Load preset states
       for (int i = 0; i < _presets.length; i++) {
@@ -134,6 +148,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await prefs.setInt('sleep_hour', _sleepTime.hour);
     await prefs.setInt('sleep_minute', _sleepTime.minute);
 
+    await prefs.setString('user_name', _nameController.text.trim());
+    setState(() => _userName = _nameController.text.trim());
+    final heightVal = double.tryParse(_heightController.text) ?? _height;
+    final clampedHeight = heightVal.clamp(
+      _heightUnit == 'cm' ? 100.0 : 39.0,
+      _heightUnit == 'cm' ? 220.0 : 87.0,
+    );
+    await prefs.setDouble('height', clampedHeight);
+    await prefs.setString('height_unit', _heightUnit);
+    setState(() => _height = clampedHeight);
+    
     final goalVal = double.tryParse(_goalController.text) ?? _dailyGoalMl;
     final clampedGoal = goalVal.clamp(500.0, 6000.0);
     await prefs.setDouble('daily_goal_ml', clampedGoal);
@@ -259,6 +284,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _buildSectionHeader(
+                          icon: Icons.person_outline_rounded,
+                          iconColor: const Color(0xFF8B5CF6),
+                          iconBg: const Color(0xFFF5F3FF),
+                          title: 'Your Profile',
+                        ),
+                        const SizedBox(height: 12),
+                        _buildProfileCard(),
+                        const SizedBox(height: 28),
+                        _buildSectionHeader(
+                          icon: Icons.track_changes_rounded,
+                          iconColor: AppTheme.primary,
+                          iconBg: const Color(0xFFF0F9FF),
+                          title: 'Daily Hydration Goal',
+                        ),
+                        const SizedBox(height: 12),
+                        _buildGoalCard(),
+                        
+                        _buildSectionHeader(
                           icon: Icons.track_changes_rounded,
                           iconColor: AppTheme.primary,
                           iconBg: const Color(0xFFF0F9FF),
@@ -333,7 +376,213 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ],
     );
   }
-
+Widget _buildProfileCard() {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Name field
+          Text(
+            'NAME',
+            style: GoogleFonts.manrope(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.muted,
+              letterSpacing: 0.8,
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _nameController,
+            decoration: InputDecoration(
+              hintText: 'Enter your name',
+              hintStyle: GoogleFonts.manrope(fontSize: 14, color: AppTheme.muted),
+            ),
+            style: GoogleFonts.manrope(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textPrimary,
+            ),
+            onChanged: (v) => setState(() => _userName = v),
+          ),
+          const SizedBox(height: 20),
+          // Height field
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'HEIGHT',
+                      style: GoogleFonts.manrope(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.muted,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        SizedBox(
+                          width: 90,
+                          child: TextField(
+                            controller: _heightController,
+                            keyboardType: TextInputType.number,
+                            style: GoogleFonts.manrope(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.primary,
+                            ),
+                            decoration: InputDecoration(
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              contentPadding: EdgeInsets.zero,
+                              isDense: true,
+                              hintText: '170',
+                              hintStyle: GoogleFonts.manrope(
+                                fontSize: 28,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.muted,
+                              ),
+                            ),
+                            onChanged: (v) {
+                              final parsed = double.tryParse(v);
+                              if (parsed != null) setState(() => _height = parsed);
+                            },
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Text(
+                            _heightUnit,
+                            style: GoogleFonts.manrope(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Unit',
+                    style: GoogleFonts.manrope(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textSecondary,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: ['cm', 'in'].map((o) {
+                        final isSelected = o == _heightUnit;
+                        return GestureDetector(
+                          onTap: () => setState(() => _heightUnit = o),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? Colors.white
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(7),
+                              boxShadow: isSelected
+                                  ? [
+                                      BoxShadow(
+                                        color: Colors.black.withAlpha(15),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 1),
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                            child: Text(
+                              o,
+                              style: GoogleFonts.manrope(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: isSelected
+                                    ? AppTheme.textPrimary
+                                    : AppTheme.textSecondary,
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              activeTrackColor: AppTheme.primary,
+              inactiveTrackColor: AppTheme.border,
+              thumbColor: AppTheme.primary,
+              overlayColor: AppTheme.primary.withAlpha(30),
+              trackHeight: 4,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+            ),
+            child: Slider(
+              value: _height.clamp(
+                _heightUnit == 'cm' ? 100 : 39,
+                _heightUnit == 'cm' ? 220 : 87,
+              ),
+              min: _heightUnit == 'cm' ? 100 : 39,
+              max: _heightUnit == 'cm' ? 220 : 87,
+              divisions: _heightUnit == 'cm' ? 120 : 48,
+              onChanged: (val) {
+                setState(() {
+                  _height = val.roundToDouble();
+                  _heightController.text = _height.round().toString();
+                });
+              },
+            ),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                _heightUnit == 'cm' ? '100 cm' : '39 in',
+                style: GoogleFonts.manrope(fontSize: 11, color: AppTheme.muted),
+              ),
+              Text(
+                _heightUnit == 'cm' ? '220 cm' : '87 in',
+                style: GoogleFonts.manrope(fontSize: 11, color: AppTheme.muted),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
   Widget _buildGoalCard() {
     final goalLiters = (_dailyGoalMl / 1000).toStringAsFixed(1);
     final glasses = (_dailyGoalMl / 250).round();
