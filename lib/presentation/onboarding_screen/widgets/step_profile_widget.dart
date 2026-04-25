@@ -305,7 +305,7 @@ class _GenderCard extends StatelessWidget {
   }
 }
 
-class _SliderField extends StatelessWidget {
+class _SliderField extends StatefulWidget {
   final String label;
   final double value;
   final double min;
@@ -323,7 +323,53 @@ class _SliderField extends StatelessWidget {
   });
 
   @override
+  State<_SliderField> createState() => _SliderFieldState();
+}
+
+class _SliderFieldState extends State<_SliderField> {
+  bool _isEditing = false;
+  late TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(
+      text: widget.value.round().toString(),
+    );
+  }
+
+  @override
+  void didUpdateWidget(_SliderField old) {
+    super.didUpdateWidget(old);
+    if (!_isEditing && old.value != widget.value) {
+      _controller.text = widget.value.round().toString();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submitEdit() {
+    final parsed = double.tryParse(_controller.text);
+    if (parsed != null) {
+      final clamped = parsed.clamp(widget.min, widget.max);
+      widget.onChanged(clamped);
+      _controller.text = clamped.round().toString();
+    } else {
+      _controller.text = widget.value.round().toString();
+    }
+    setState(() => _isEditing = false);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // Extract unit suffix from displayValue (e.g. "70 kg" → "kg")
+    final parts = widget.displayValue.split(' ');
+    final unit = parts.length > 1 ? parts.last : '';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -331,7 +377,7 @@ class _SliderField extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              label,
+              widget.label,
               style: GoogleFonts.manrope(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
@@ -339,15 +385,78 @@ class _SliderField extends StatelessWidget {
                 letterSpacing: 0.5,
               ),
             ),
-            Text(
-              displayValue,
-              style: GoogleFonts.manrope(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: AppTheme.primary,
-                fontFeatures: const [FontFeature.tabularFigures()],
-              ),
-            ),
+            _isEditing
+                ? SizedBox(
+                    width: 80,
+                    child: TextField(
+                      controller: _controller,
+                      autofocus: true,
+                      keyboardType: TextInputType.number,
+                      textAlign: TextAlign.right,
+                      style: GoogleFonts.manrope(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.primary,
+                      ),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 4,
+                          horizontal: 4,
+                        ),
+                        suffix: Text(
+                          ' $unit',
+                          style: GoogleFonts.manrope(
+                            fontSize: 13,
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                      ),
+                      onSubmitted: (_) => _submitEdit(),
+                      onEditingComplete: _submitEdit,
+                    ),
+                  )
+                : GestureDetector(
+                    onTap: () {
+                      _controller.text = widget.value.round().toString();
+                      setState(() => _isEditing = true);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary.withAlpha(20),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: AppTheme.primary.withAlpha(60),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            widget.displayValue,
+                            style: GoogleFonts.manrope(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.primary,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.edit_rounded,
+                            size: 12,
+                            color: AppTheme.primary.withAlpha(180),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
           ],
         ),
         SliderTheme(
@@ -360,10 +469,10 @@ class _SliderField extends StatelessWidget {
             thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
           ),
           child: Slider(
-            value: value.clamp(min, max),
-            min: min,
-            max: max,
-            onChanged: onChanged,
+            value: widget.value.clamp(widget.min, widget.max),
+            min: widget.min,
+            max: widget.max,
+            onChanged: widget.onChanged,
           ),
         ),
       ],
