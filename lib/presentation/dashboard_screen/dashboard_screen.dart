@@ -81,7 +81,10 @@ class _DashboardScreenState extends State<DashboardScreen>
     final sleepMinute = prefs.getInt('sleep_minute') ?? 30;
     final intervalMinutes = prefs.getInt('reminder_interval') ?? 60;
 
-    await notifService.scheduleHydrationReminders(
+    // Refresh reminders daily — this cancels any leftover
+    // notifications from previous days and reschedules only
+    // between wake and sleep time for today
+    await notifService.refreshDailyReminders(
       wakeHour: wakeHour,
       wakeMinute: wakeMinute,
       sleepHour: sleepHour,
