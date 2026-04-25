@@ -309,7 +309,7 @@ class _LogDrinkSheetWidgetState extends State<LogDrinkSheetWidget> {
             ],
             const SizedBox(height: 28),
 
-            // Summary chip
+            // Summary chip with editable amount
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
@@ -320,17 +320,94 @@ class _LogDrinkSheetWidgetState extends State<LogDrinkSheetWidget> {
                 children: [
                   Icon(_selectedIcon, color: _selectedColor, size: 20),
                   const SizedBox(width: 12),
-                  Text(
-                    '$_selectedType — ${_useCustom ? _customAmount : _selectedAmount} ml',
-                    style: GoogleFonts.manrope(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textPrimary,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _selectedType,
+                          style: GoogleFonts.manrope(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Text(
+                              'Amount: ',
+                              style: GoogleFonts.manrope(
+                                fontSize: 12,
+                                color: AppTheme.textSecondary,
+                              ),
+                            ),
+                            SizedBox(
+                              width: 60,
+                              child: TextField(
+                                controller: TextEditingController(
+                                  text: (_useCustom
+                                          ? _customAmount
+                                          : _selectedAmount)
+                                      .toString(),
+                                )..selection = TextSelection.collapsed(
+                                    offset: (_useCustom
+                                            ? _customAmount
+                                            : _selectedAmount)
+                                        .toString()
+                                        .length,
+                                  ),
+                                keyboardType: TextInputType.number,
+                                style: GoogleFonts.manrope(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: _selectedColor,
+                                ),
+                                decoration: InputDecoration(
+                                  isDense: true,
+                                  contentPadding:
+                                      const EdgeInsets.symmetric(vertical: 2),
+                                  border: UnderlineInputBorder(
+                                    borderSide: BorderSide(
+                                      color: _selectedColor.withAlpha(120),
+                                    ),
+                                  ),
+                                  enabledBorder: UnderlineInputBorder(
+                                    borderSide: BorderSide(
+                                      color: _selectedColor.withAlpha(120),
+                                    ),
+                                  ),
+                                  focusedBorder: UnderlineInputBorder(
+                                    borderSide:
+                                        BorderSide(color: _selectedColor),
+                                  ),
+                                ),
+                                onChanged: (v) {
+                                  final parsed = int.tryParse(v);
+                                  if (parsed != null && parsed > 0) {
+                                    setState(() {
+                                      _customAmount = parsed;
+                                      _useCustom = true;
+                                    });
+                                  }
+                                },
+                              ),
+                            ),
+                            Text(
+                              ' ml',
+                              style: GoogleFonts.manrope(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
-                  const Spacer(),
                   Text(
-                    '${(((_useCustom ? _customAmount : _selectedAmount)) * 0.033814).toStringAsFixed(1)} oz',
+                    '${((_useCustom ? _customAmount : _selectedAmount) * 0.033814).toStringAsFixed(1)} oz',
                     style: GoogleFonts.manrope(
                       fontSize: 12,
                       fontWeight: FontWeight.w400,
