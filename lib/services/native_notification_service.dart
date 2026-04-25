@@ -150,13 +150,53 @@ class NativeNotificationService {
           ),
         ),
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
-        matchDateTimeComponents: DateTimeComponents.time,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
       );
 
       notifId++;
       currentMinute += intervalMinutes;
     }
+    // Schedule a daily re-scheduler at wake time
+    // This re-runs scheduling each morning so reminders repeat every day
+    final wakeupReschedule = tz.TZDateTime(
+      tz.local,
+      now.year,
+      now.month,
+      now.day,
+      wakeHour,
+      wakeMinute,
+    );
+    final nextWakeup = wakeupReschedule.isBefore(now)
+        ? wakeupReschedule.add(const Duration(days: 1))
+        : wakeupReschedule;
+
+    await _plugin.zonedSchedule(
+      9000, // reserved ID for daily reschedule trigger
+      'HydroTrack 💧',
+      _messages[0],
+      nextWakeup,
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          _channelId,
+          _channelName,
+          channelDescription: _channelDesc,
+          importance: Importance.high,
+          priority: Priority.high,
+          icon: '@mipmap/ic_launcher',
+          color: const Color(0xFF0EA5E9),
+        ),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
+      ),
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+      matchDateTimeComponents: DateTimeComponents.time,
+    );
   }
 
   Future<void> cancelAll() async {
