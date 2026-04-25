@@ -32,72 +32,12 @@ class _DashboardScreenState extends State<DashboardScreen>
   String _userName = 'Alex';
   bool _isLoading = true;
 
-  // Log entries for today
-  final List<Map<String, dynamic>> _logEntries = [
-    {
-      'time': '08:15 AM',
-      'amount': 250,
-      'type': 'Water',
-      'icon': Icons.local_drink_outlined,
-      'color': const Color(0xFF0EA5E9),
-    },
-    {
-      'time': '09:42 AM',
-      'amount': 350,
-      'type': 'Green Tea',
-      'icon': Icons.emoji_food_beverage_outlined,
-      'color': const Color(0xFF10B981),
-    },
-    {
-      'time': '11:20 AM',
-      'amount': 500,
-      'type': 'Water',
-      'icon': Icons.water_rounded,
-      'color': const Color(0xFF0EA5E9),
-    },
-    {
-      'time': '01:05 PM',
-      'amount': 250,
-      'type': 'Juice',
-      'icon': Icons.local_bar_outlined,
-      'color': const Color(0xFFF59E0B),
-    },
-    {
-      'time': '02:30 PM',
-      'amount': 200,
-      'type': 'Coffee',
-      'icon': Icons.coffee_rounded,
-      'color': const Color(0xFF8B5CF6),
-    },
-  ];
+  // Log entries for today - starts empty
+  final List<Map<String, dynamic>> _logEntries = [];
 
-  // Hourly data (24h, 0=midnight)
-  final List<double> _hourlyIntake = [
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    250,
-    0,
-    350,
-    0,
-    500,
-    0,
-    250,
-    0,
-    200,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-  ];
+  // Hourly data (24h, 0=midnight) - starts empty
+  final List<double> _hourlyIntake = List.filled(24, 0.0);
+
 
   late AnimationController _fabPulseController;
 
@@ -158,10 +98,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       setState(() {
         _userName = prefs.getString('user_name') ?? 'there';
         _dailyGoalMl = prefs.getDouble('daily_goal_ml') ?? 2500;
-        _todayIntakeMl = _logEntries.fold(
-          0.0,
-          (sum, e) => sum + (e['amount'] as int),
-        );
+        _todayIntakeMl = 0.0;
         _isLoading = false;
       });
     }
