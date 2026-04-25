@@ -34,6 +34,24 @@ class NotificationService {
     await NativeNotificationService().initialize();
   }
 
+  /// Call this on every app launch to refresh today's notifications
+  Future<void> refreshDailyReminders({
+    required int wakeHour,
+    required int wakeMinute,
+    required int sleepHour,
+    required int sleepMinute,
+    required int intervalMinutes,
+  }) async {
+    if (kIsWeb) return;
+    await scheduleHydrationReminders(
+      wakeHour: wakeHour,
+      wakeMinute: wakeMinute,
+      sleepHour: sleepHour,
+      sleepMinute: sleepMinute,
+      intervalMinutes: intervalMinutes,
+    );
+  }
+
   Future<bool> requestPermissions() async {
     if (kIsWeb) return false;
     return NativeNotificationService().requestPermissions();
