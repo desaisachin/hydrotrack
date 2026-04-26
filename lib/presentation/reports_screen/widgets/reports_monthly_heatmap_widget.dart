@@ -28,8 +28,11 @@ class ReportsMonthlyHeatmapWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // April 2026 starts on Wednesday (index 2 in Mon-first week)
-    const startOffset = 2;
-    const daysInMonth = 30;
+    final now = DateTime.now();
+        final firstDayOfMonth = DateTime(now.year, now.month, 1);
+        // weekday: 1=Mon, 7=Sun — we offset from Monday
+        final startOffset = firstDayOfMonth.weekday - 1;
+        final daysInMonth = monthlyData.length;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -102,7 +105,7 @@ class ReportsMonthlyHeatmapWidget extends StatelessWidget {
                 final dayIndex = index - startOffset;
                 final day = dayIndex + 1;
                 final achievement = monthlyData[dayIndex];
-                final isToday = day == 22; // April 22, 2026
+                final isToday = day == DateTime.now().day;
 
                 return AnimatedContainer(
                   duration: Duration(milliseconds: 200 + dayIndex * 15),
