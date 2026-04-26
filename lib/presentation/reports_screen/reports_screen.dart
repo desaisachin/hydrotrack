@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../routes/app_routes.dart';
 import '../../theme/app_theme.dart';
@@ -20,59 +21,17 @@ class ReportsScreen extends StatefulWidget {
 
 class _ReportsScreenState extends State<ReportsScreen>
     with SingleTickerProviderStateMixin {
-  // TODO: Replace with Riverpod for production
   int _navIndex = 1;
   bool _isWeekView = true;
+  bool _isLoading = true;
   late AnimationController _switchController;
   late Animation<double> _switchFade;
 
-  // Mock weekly data (last 7 days, ml)
-  final List<Map<String, dynamic>> _weeklyData = [
-    {'day': 'Mon', 'intake': 2100.0, 'goal': 2500.0},
-    {'day': 'Tue', 'intake': 2650.0, 'goal': 2500.0},
-    {'day': 'Wed', 'intake': 1800.0, 'goal': 2500.0},
-    {'day': 'Thu', 'intake': 2500.0, 'goal': 2500.0},
-    {'day': 'Fri', 'intake': 2900.0, 'goal': 2500.0},
-    {'day': 'Sat', 'intake': 1400.0, 'goal': 2500.0},
-    {'day': 'Sun', 'intake': 1550.0, 'goal': 2500.0},
-  ];
-
-  // Mock monthly data (April 2026, achievement %)
-  late final List<double> _monthlyData;
-
-  // Mock 30-day trend
-  final List<double> _trendData = [
-    1800,
-    2100,
-    2400,
-    2200,
-    1900,
-    2500,
-    2700,
-    2300,
-    2100,
-    2600,
-    2450,
-    2200,
-    1750,
-    2300,
-    2500,
-    2800,
-    2600,
-    2100,
-    2400,
-    2700,
-    2500,
-    2200,
-    2600,
-    2800,
-    2400,
-    1900,
-    2100,
-    2500,
-    2650,
-    1550,
-  ];
+  // Real data from storage
+  List<Map<String, dynamic>> _weeklyData = [];
+  List<double> _monthlyData = [];
+  List<double> _trendData = [];
+  double _dailyGoalMl = 2500;
 
   @override
   void initState() {
@@ -86,49 +45,92 @@ class _ReportsScreenState extends State<ReportsScreen>
       curve: Curves.easeOut,
     );
     _switchController.forward();
-
-    // Generate monthly data
-    _monthlyData = List.generate(30, (i) {
-      final values = [
-        0.84,
-        1.06,
-        0.72,
-        1.0,
-        1.16,
-        0.56,
-        0.62,
-        0.88,
-        0.96,
-        1.04,
-        0.78,
-        0.92,
-        0.70,
-        0.94,
-        1.0,
-        1.12,
-        1.04,
-        0.84,
-        0.96,
-        1.08,
-        1.0,
-        0.88,
-        1.04,
-        1.12,
-        0.96,
-        0.76,
-        0.84,
-        1.0,
-        1.06,
-        0.62,
-      ];
-      return values[i % values.length];
-    });
+    _loadReportData();
   }
 
   @override
   void dispose() {
     _switchController.dispose();
     super.dispose();
+  }
+
+  // Build a date key string from a DateTime
+  String _dateKey(DateTime date) {
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _loadReportData() async {
+    final prefs = await SharedPreferences.getInstance();
+    _dailyGoalMl = prefs.getDouble('daily_goal_ml') ?? 2500;
+
+    final now = DateTime.now();
+
+    // --- Weekly data (last 7 days) ---
+    final List<Map<String, dynamic>> weekly = [];
+    final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+    for (int i = 6; i >= 0; i--) {
+      final date = now.subtract(Duration(days: i));
+      final key = _dateKey(date);
+      final intake = prefs.getDouble('intake_$key') ?? 0.0;
+      final goal = prefs.getDouble('goal_$key') ?? _dailyGoalMl;
+      weekly.add({
+        'day': dayNames[date.weekday - 1],
+        'date': key,
+        'intake': intake,
+        'goal': goal,
+      });
+    }
+
+    // --- Monthly heatmap (last 30 days) ---
+    final List<double> monthly = [];
+    for (int i = 29; i >= 0; i--) {
+      final date = now.subtract(Duration(days: i));
+      final key = _dateKey(date);
+      final intake = prefs.getDouble('intake_$key') ?? 0.0;
+      final goal = prefs.getDouble('goal_$key') ?? _dailyGoalMl;
+      final achievement = goal > 0 ? intake / goal : 0.0;
+      monthly.add(achievement);
+    }
+
+    // --- 30-day trend ---
+    final List<double> trend = [];
+    for (int i = 29; i >= 0; i--) {
+      final date = now.subtract(Duration(days: i));
+      final key = _dateKey(date);
+      final intake = prefs.getDouble('intake_$key') ?? 0.0;
+      trend.add(intake);
+    }
+
+    if (mounted) {
+      setState(() {
+        _weeklyData = weekly;
+        _monthlyData = monthly;
+        _trendData = trend;
+        _isLoading = false;
+      });
+    }
+  }
+
+  // Check if there is any real logged data at all
+  bool get _hasAnyData {
+    return _weeklyData.any((d) => (d['intake'] as double) > 0) ||
+        _trendData.any((v) => v > 0);
+  }
+
+  // Check if this week has any data
+  bool get _hasWeeklyData {
+    return _weeklyData.any((d) => (d['intake'] as double) > 0);
+  }
+
+  // Check if month has any data
+  bool get _hasMonthlyData {
+    return _monthlyData.any((v) => v > 0);
+  }
+
+  // Check if trend has enough data (at least 7 days)
+  bool get _hasTrendData {
+    return _trendData.where((v) => v > 0).length >= 2;
   }
 
   void _onNavTap(int index) {
@@ -145,31 +147,41 @@ class _ReportsScreenState extends State<ReportsScreen>
     _switchController.forward();
   }
 
-  // Derived stats
   double get _avgIntake {
-    final sum = _weeklyData.fold(0.0, (s, d) => s + (d['intake'] as double));
-    return sum / _weeklyData.length;
+    if (!_hasWeeklyData) return 0;
+    final daysWithData =
+        _weeklyData.where((d) => (d['intake'] as double) > 0).toList();
+    if (daysWithData.isEmpty) return 0;
+    final sum =
+        daysWithData.fold(0.0, (s, d) => s + (d['intake'] as double));
+    return sum / daysWithData.length;
   }
 
   double get _bestDay {
+    if (!_hasWeeklyData) return 0;
     return _weeklyData
         .map((d) => d['intake'] as double)
         .reduce((a, b) => a > b ? a : b);
   }
 
   String get _bestDayName {
-    return _weeklyData.firstWhere((d) => d['intake'] == _bestDay)['day']
-        as String;
+    if (!_hasWeeklyData) return '-';
+    return _weeklyData.firstWhere(
+            (d) => d['intake'] == _bestDay,
+            orElse: () => {'day': '-'})['day'] as String;
   }
 
   int get _goalHitCount {
     return _weeklyData
-        .where((d) => (d['intake'] as double) >= (d['goal'] as double))
+        .where((d) => (d['intake'] as double) >= (d['goal'] as double) &&
+            (d['intake'] as double) > 0)
         .length;
   }
 
   double get _monthlyAvg {
-    return _trendData.reduce((a, b) => a + b) / _trendData.length;
+    final daysWithData = _trendData.where((v) => v > 0).toList();
+    if (daysWithData.isEmpty) return 0;
+    return daysWithData.reduce((a, b) => a + b) / daysWithData.length;
   }
 
   @override
@@ -180,10 +192,13 @@ class _ReportsScreenState extends State<ReportsScreen>
       backgroundColor: AppTheme.background,
       extendBody: true,
       appBar: _buildAppBar(),
-      body: SafeArea(
-        bottom: false,
-        child: isTablet ? _buildTabletLayout() : _buildPhoneLayout(),
-      ),
+      body: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(color: AppTheme.primary))
+          : SafeArea(
+              bottom: false,
+              child: isTablet ? _buildTabletLayout() : _buildPhoneLayout(),
+            ),
       bottomNavigationBar: AppNavigationWidget(
         currentIndex: _navIndex,
         onTap: _onNavTap,
@@ -211,41 +226,36 @@ class _ReportsScreenState extends State<ReportsScreen>
                   ),
                 ),
               ),
-              // Export button
-              InkWell(
-                onTap: _showExportSheet,
-                borderRadius: BorderRadius.circular(10),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppTheme.border),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.ios_share_rounded,
-                        size: 16,
-                        color: AppTheme.primary,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Export',
-                        style: GoogleFonts.manrope(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.primary,
+              if (_hasAnyData)
+                InkWell(
+                  onTap: _showExportSheet,
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppTheme.border),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.ios_share_rounded,
+                            size: 16, color: AppTheme.primary),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Export',
+                          style: GoogleFonts.manrope(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.primary,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
         ),
@@ -254,52 +264,86 @@ class _ReportsScreenState extends State<ReportsScreen>
   }
 
   Widget _buildPhoneLayout() {
-    return CustomScrollView(
-      slivers: [
-        SliverToBoxAdapter(
-          child: Column(
-            children: [
-              const SizedBox(height: 8),
-              ReportsHeaderWidget(
-                avgIntake: _avgIntake,
-                goalHitCount: _goalHitCount,
-                totalDays: _weeklyData.length,
-              ),
-              const SizedBox(height: 16),
-              ReportsPeriodToggleWidget(
-                isWeekView: _isWeekView,
-                onToggle: _togglePeriod,
-              ),
-              const SizedBox(height: 16),
-              FadeTransition(
-                opacity: _switchFade,
-                child: _isWeekView
-                    ? ReportsWeeklyChartWidget(weeklyData: _weeklyData)
-                    : ReportsMonthlyHeatmapWidget(
-                        monthlyData: _monthlyData,
-                        month: 'April 2026',
+    // Show full empty state if no data at all
+    if (!_hasAnyData) {
+      return _buildEmptyState();
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadReportData,
+      color: AppTheme.primary,
+      child: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Column(
+              children: [
+                const SizedBox(height: 8),
+                ReportsHeaderWidget(
+                  avgIntake: _avgIntake,
+                  goalHitCount: _goalHitCount,
+                  totalDays: _weeklyData.length,
+                ),
+                const SizedBox(height: 16),
+                ReportsPeriodToggleWidget(
+                  isWeekView: _isWeekView,
+                  onToggle: _togglePeriod,
+                ),
+                const SizedBox(height: 16),
+                FadeTransition(
+                  opacity: _switchFade,
+                  child: _isWeekView
+                      ? (_hasWeeklyData
+                          ? ReportsWeeklyChartWidget(
+                              weeklyData: _weeklyData)
+                          : _buildSectionEmpty(
+                              'No data this week yet',
+                              'Start logging drinks on the Today tab',
+                              Icons.water_drop_outlined,
+                            ))
+                      : (_hasMonthlyData
+                          ? ReportsMonthlyHeatmapWidget(
+                              monthlyData: _monthlyData,
+                              month: _currentMonthLabel(),
+                            )
+                          : _buildSectionEmpty(
+                              'No monthly data yet',
+                              'Keep logging daily and your heatmap will fill up',
+                              Icons.calendar_month_outlined,
+                            )),
+                ),
+                const SizedBox(height: 16),
+                _hasWeeklyData
+                    ? ReportsStatsRowWidget(
+                        avgIntake: _avgIntake,
+                        bestDay: _bestDay,
+                        bestDayName: _bestDayName,
+                        goalHitCount: _goalHitCount,
+                        totalDays: _weeklyData
+                            .where((d) => (d['intake'] as double) > 0)
+                            .length,
+                        monthlyAvg: _monthlyAvg,
+                      )
+                    : const SizedBox.shrink(),
+                const SizedBox(height: 16),
+                _hasTrendData
+                    ? ReportsTrendChartWidget(trendData: _trendData)
+                    : _buildSectionEmpty(
+                        'Not enough data for trend',
+                        'Log water for at least 2 days to see your trend',
+                        Icons.show_chart_rounded,
                       ),
-              ),
-              const SizedBox(height: 16),
-              ReportsStatsRowWidget(
-                avgIntake: _avgIntake,
-                bestDay: _bestDay,
-                bestDayName: _bestDayName,
-                goalHitCount: _goalHitCount,
-                totalDays: _weeklyData.length,
-                monthlyAvg: _monthlyAvg,
-              ),
-              const SizedBox(height: 16),
-              ReportsTrendChartWidget(trendData: _trendData),
-              const SizedBox(height: 120),
-            ],
+                const SizedBox(height: 120),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
   Widget _buildTabletLayout() {
+    if (!_hasAnyData) return _buildEmptyState();
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -314,9 +358,21 @@ class _ReportsScreenState extends State<ReportsScreen>
                   totalDays: _weeklyData.length,
                 ),
                 const SizedBox(height: 16),
-                ReportsWeeklyChartWidget(weeklyData: _weeklyData),
+                _hasWeeklyData
+                    ? ReportsWeeklyChartWidget(weeklyData: _weeklyData)
+                    : _buildSectionEmpty(
+                        'No data this week yet',
+                        'Start logging drinks on the Today tab',
+                        Icons.water_drop_outlined,
+                      ),
                 const SizedBox(height: 16),
-                ReportsTrendChartWidget(trendData: _trendData),
+                _hasTrendData
+                    ? ReportsTrendChartWidget(trendData: _trendData)
+                    : _buildSectionEmpty(
+                        'Not enough data for trend',
+                        'Log water for at least 2 days to see your trend',
+                        Icons.show_chart_rounded,
+                      ),
               ],
             ),
           ),
@@ -326,25 +382,220 @@ class _ReportsScreenState extends State<ReportsScreen>
             padding: const EdgeInsets.fromLTRB(10, 8, 20, 120),
             child: Column(
               children: [
-                ReportsMonthlyHeatmapWidget(
-                  monthlyData: _monthlyData,
-                  month: 'April 2026',
-                ),
+                _hasMonthlyData
+                    ? ReportsMonthlyHeatmapWidget(
+                        monthlyData: _monthlyData,
+                        month: _currentMonthLabel(),
+                      )
+                    : _buildSectionEmpty(
+                        'No monthly data yet',
+                        'Keep logging daily and your heatmap will fill up',
+                        Icons.calendar_month_outlined,
+                      ),
                 const SizedBox(height: 16),
-                ReportsStatsRowWidget(
-                  avgIntake: _avgIntake,
-                  bestDay: _bestDay,
-                  bestDayName: _bestDayName,
-                  goalHitCount: _goalHitCount,
-                  totalDays: _weeklyData.length,
-                  monthlyAvg: _monthlyAvg,
-                ),
+                if (_hasWeeklyData)
+                  ReportsStatsRowWidget(
+                    avgIntake: _avgIntake,
+                    bestDay: _bestDay,
+                    bestDayName: _bestDayName,
+                    goalHitCount: _goalHitCount,
+                    totalDays: _weeklyData
+                        .where((d) => (d['intake'] as double) > 0)
+                        .length,
+                    monthlyAvg: _monthlyAvg,
+                  ),
               ],
             ),
           ),
         ),
       ],
     );
+  }
+
+  // Full screen empty state — shown when user has zero data
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0F9FF),
+                borderRadius: BorderRadius.circular(50),
+              ),
+              child: const Icon(
+                Icons.water_drop_outlined,
+                size: 48,
+                color: AppTheme.primary,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Not enough data yet',
+              style: GoogleFonts.manrope(
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.textPrimary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Drink enough water, log it and I\'ll tell you how you are doing.',
+              style: GoogleFonts.manrope(
+                fontSize: 15,
+                fontWeight: FontWeight.w400,
+                color: AppTheme.textSecondary,
+                height: 1.5,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            // Tips card
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppTheme.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'How to get started',
+                    style: GoogleFonts.manrope(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _tipRow('1', 'Go to the Today tab'),
+                  const SizedBox(height: 8),
+                  _tipRow('2', 'Tap Log Drink or use Quick Add'),
+                  const SizedBox(height: 8),
+                  _tipRow('3', 'Come back here after logging'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 28),
+            ElevatedButton.icon(
+              onPressed: () =>
+                  Navigator.pushReplacementNamed(
+                      context, AppRoutes.dashboardScreen),
+              icon: const Icon(Icons.add_rounded, size: 20),
+              label: Text(
+                'Go Log a Drink',
+                style: GoogleFonts.manrope(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 28, vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Small empty state card for individual chart sections
+  Widget _buildSectionEmpty(
+      String title, String subtitle, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(28),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppTheme.border),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, size: 36, color: AppTheme.muted),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              style: GoogleFonts.manrope(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              subtitle,
+              style: GoogleFonts.manrope(
+                fontSize: 12,
+                fontWeight: FontWeight.w400,
+                color: AppTheme.muted,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _tipRow(String number, String text) {
+    return Row(
+      children: [
+        Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            color: AppTheme.primary.withAlpha(20),
+            shape: BoxShape.circle,
+          ),
+          child: Center(
+            child: Text(
+              number,
+              style: GoogleFonts.manrope(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.primary,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          text,
+          style: GoogleFonts.manrope(
+            fontSize: 13,
+            fontWeight: FontWeight.w400,
+            color: AppTheme.textSecondary,
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _currentMonthLabel() {
+    final months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    final now = DateTime.now();
+    return '${months[now.month - 1]} ${now.year}';
   }
 
   void _showExportSheet() {
@@ -428,7 +679,6 @@ class _ExportOption extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
-      splashColor: color.withAlpha(15),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -471,7 +721,8 @@ class _ExportOption extends StatelessWidget {
                 ],
               ),
             ),
-            Icon(Icons.chevron_right_rounded, color: AppTheme.muted, size: 20),
+            Icon(Icons.chevron_right_rounded,
+                color: AppTheme.muted, size: 20),
           ],
         ),
       ),
