@@ -94,16 +94,91 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Future<void> _loadUserData() async {
-    // TODO: Replace with actual data persistence in production
     final prefs = await SharedPreferences.getInstance();
     await Future.delayed(const Duration(milliseconds: 400));
+
+    // Load today's logs from storage
+    final today = _todayKey();
+    final savedLogs = prefs.getStringList('logs_$today') ?? [];
+    final List<Map<String, dynamic>> loadedEntries = [];
+    final List<double> loadedHourly = List.filled(24, 0.0);
+    double totalIntake = 0.0;
+
+    for (final raw in savedLogs) {
+      final parts = raw.split('|');
+      if (parts.length < 3) continue;
+      final time = parts[0];
+      final amount = int.tryParse(parts[1]) ?? 0;
+      final type = parts[2];
+      final hour = int.tryParse(parts.length > 3 ? parts[3] : '0') ?? 0;
+
+      final iconAndColor = _iconColorForType(type);
+      loadedEntries.add({
+        'time': time,
+        'amount': amount,
+        'type': type,
+        'icon': iconAndColor.$1,
+        'color': iconAndColor.$2,
+      });
+      totalIntake += amount;
+      if (hour >= 0 && hour < 24) {
+        loadedHourly[hour] += amount;
+      }
+    }
+
     if (mounted) {
       setState(() {
         _userName = prefs.getString('user_name') ?? 'there';
         _dailyGoalMl = prefs.getDouble('daily_goal_ml') ?? 2500;
-        _todayIntakeMl = 0.0;
+        _logEntries.clear();
+        _logEntries.addAll(loadedEntries);
+        for (int i = 0; i < 24; i++) {
+          _hourlyIntake[i] = loadedHourly[i];
+        }
+        _todayIntakeMl = totalIntake;
         _isLoading = false;
       });
+    }
+  }
+
+  // Returns today's date as a storage key e.g. "2026-04-26"
+  String _todayKey() {
+    final now = DateTime.now();
+    return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+  }
+
+  // Save all of today's logs to SharedPreferences
+  Future<void> _saveLogs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final today = _todayKey();
+    final List<String> encoded = _logEntries.map((e) {
+      final hour = DateTime.now().hour;
+      return '${e['time']}|${e['amount']}|${e['type']}|$hour';
+    }).toList();
+    await prefs.setStringList('logs_$today', encoded);
+
+    // Also save daily summary for reports
+    await prefs.setDouble('intake_$today', _todayIntakeMl);
+    await prefs.setDouble('goal_$today', _dailyGoalMl);
+  }
+
+  // Returns icon and color for a drink type
+  (IconData, Color) _iconColorForType(String type) {
+    switch (type) {
+      case 'Tea':
+        return (Icons.emoji_food_beverage_outlined, const Color(0xFF10B981));
+      case 'Coffee':
+        return (Icons.coffee_rounded, const Color(0xFF8B5CF6));
+      case 'Juice':
+        return (Icons.local_bar_outlined, const Color(0xFFF59E0B));
+      case 'Smoothie':
+        return (Icons.blender_outlined, const Color(0xFFEC4899));
+      case 'Sports':
+        return (Icons.sports_rounded, const Color(0xFF06B6D4));
+      case 'Milk':
+        return (Icons.water_drop_outlined, const Color(0xFF94A3B8));
+      default:
+        return (Icons.local_drink_outlined, const Color(0xFF0EA5E9));
     }
   }
 
@@ -129,18 +204,19 @@ class _DashboardScreenState extends State<DashboardScreen>
           final minute = now.minute.toString().padLeft(2, '0');
           final period = now.period == DayPeriod.am ? 'AM' : 'PM';
           setState(() {
-            _logEntries.insert(0, {
-              'time': '$hour:$minute $period',
-              'amount': amount,
-              'type': type,
-              'icon': icon,
-              'color': color,
+              _logEntries.insert(0, {
+                'time': '$hour:$minute $period',
+                'amount': amount,
+                'type': type,
+                'icon': icon,
+                'color': color,
+              });
+              _todayIntakeMl += amount;
+              if (DateTime.now().hour < 24) {
+                _hourlyIntake[DateTime.now().hour] += amount;
+              }
             });
-            _todayIntakeMl += amount;
-            if (DateTime.now().hour < 24) {
-              _hourlyIntake[DateTime.now().hour] += amount;
-            }
-          });
+            _saveLogs();
         },
       ),
     );
@@ -165,6 +241,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         _hourlyIntake[DateTime.now().hour] += amount.toDouble();
       }
     });
+    _saveLogs();
   }
 
   double get _progressPercent =>
@@ -323,6 +400,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                       _todayIntakeMl -= (_logEntries[index]['amount'] as int);
                       _logEntries.removeAt(index);
                     });
+                    _saveLogs();
                   },
                 ),
               ),
